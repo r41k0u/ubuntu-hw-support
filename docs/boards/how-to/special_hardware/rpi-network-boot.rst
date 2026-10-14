@@ -83,6 +83,13 @@ The preparation happens once, on the Pi itself, booted from a microSD card.
        sudo apt update
        sudo apt full-upgrade
 
+   If the upgrade installed a new kernel, reboot before continuing, so that
+   the initramfs built below matches the kernel the Pi will boot:
+
+   .. code-block:: text
+
+       sudo reboot
+
 3. Include NBD support in the initramfs. By default, the initramfs only
    includes what is needed to mount the current root file-system, which is on
    the microSD card:
@@ -176,8 +183,9 @@ inserted in a card reader. Check the device name of the card with
 
 .. warning::
 
-    The :manpage:`dd(1)` command below reads from the card. Double check the
-    device name: writing to the wrong device destroys its data.
+    Double check the device name before running the commands below. With
+    the wrong device, you copy the wrong partition, or the server's own
+    disks, into the TFTP directory and the root file-system image.
 
 1. Install the servers:
 
@@ -193,6 +201,7 @@ inserted in a card reader. Check the device name of the card with
 
        sudo mkdir -p /srv/nbd
        sudo dd if=/dev/sdX2 of=/srv/nbd/pi-root.img bs=4M status=progress
+       sudo chown nbd:nbd /srv/nbd/pi-root.img
 
 3. Copy the contents of the boot partition, the first partition of the card,
    to the TFTP directory:
@@ -214,8 +223,9 @@ inserted in a card reader. Check the device name of the card with
    The parameters relevant to network boot are:
 
    ``root=nbd:10.0.0.1:pi-root:ext4``
-       Mount the root file-system from the NBD export ``pi-root`` on the server
-       10.0.0.1, as an ext4 file-system
+       Mount the root file-system from the NBD export named ``pi-root`` on
+       the server 10.0.0.1, as an ext4 file-system. A non-numeric value after
+       the server address is the export name; a number would be a TCP port
 
    ``ip=10.0.0.145::10.0.0.1:255.255.255.0::eth0:off``
        The Pi's address, gateway, netmask and interface. Use the same values
@@ -227,6 +237,8 @@ inserted in a card reader. Check the device name of the card with
    .. code-block:: ini
 
        [generic]
+           user = nbd
+           group = nbd
            listenaddr = 10.0.0.1
 
        [pi-root]
@@ -241,11 +253,13 @@ inserted in a card reader. Check the device name of the card with
        interface=eth0
        bind-interfaces
        port=0
-       dhcp-range=10.0.0.100,10.0.0.200,12h
+       dhcp-range=10.0.0.150,10.0.0.200,12h
        enable-tftp
        tftp-root=/srv/tftp
 
-   ``port=0`` disables the DNS server, which is not needed here.
+   ``port=0`` disables the DNS server, which is not needed here. The DHCP
+   range is only used by the boot EEPROM, and must not include the Pi's
+   static address.
 
 7. Give the server's interface its address, and restart both servers:
 
